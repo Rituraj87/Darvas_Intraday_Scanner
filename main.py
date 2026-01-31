@@ -3,167 +3,225 @@ import pandas as pd
 import yfinance as yf
 import requests
 import io
+import numpy as np
+from datetime import datetime
+import pytz
 
-# --- 1. पेज सेटअप (Page Config) ---
-st.set_page_config(page_title="Pro Intraday Scanner", layout="wide")
+# --- 1. पेज सेटअप (Mobile Friendly) ---
+st.set_page_config(
+    page_title="Pro Trader Scanner",
+    layout="wide",
+    initial_sidebar_state="collapsed" # मोबाइल पर साइडबार बंद रहेगा
+)
 
-# --- 2. पासवर्ड सिस्टम (Authentication) ---
-def check_password():
-    """Returns `True` if the user had the correct password."""
-
-    def password_entered():
-        """Checks whether a password entered by the user is correct."""
-        if st.session_state["password"] == "Admin": # आपका पासवर्ड
-            st.session_state["password_correct"] = True
-            del st.session_state["password"]  # पासवर्ड को मेमोरी से हटा दें
-        else:
-            st.session_state["password_correct"] = False
-
-    if "password_correct" not in st.session_state:
-        # अगर पासवर्ड नहीं डाला है तो इनपुट बॉक्स दिखाएं
-        st.text_input(
-            "कृपया ऑथेंटिक पासवर्ड दर्ज करें:", type="password", on_change=password_entered, key="password"
-        )
-        return False
-    elif not st.session_state["password_correct"]:
-        # गलत पासवर्ड
-        st.text_input(
-            "कृपया ऑथेंटिक पासवर्ड दर्ज करें:", type="password", on_change=password_entered, key="password"
-        )
-        st.error("😕 पासवर्ड गलत है। कृपया दोबारा प्रयास करें।")
-        return False
-    else:
-        # पासवर्ड सही है
-        return True
-
-if check_password():
-    # --- 3. डिस्क्लेमर (Warning Notification) ---
-    st.markdown("""
-        <div style="background-color: #ffcccc; padding: 15px; border-radius: 10px; border: 2px solid #ff0000; margin-bottom: 20px;">
-            <h3 style="color: #990000; margin:0;">⚠️ ट्रेडिंग चेतावनी (Disclaimer)</h3>
-            <p style="color: #333; font-weight: bold;">
-                यह डेटा केवल लाइव मार्केट एनालिसिस के लिए है। कोई भी ट्रेड लेने से पहले अपनी खुद की रिसर्च जरूर करें। 
-                बाजार जोखिमों के अधीन है। स्टॉप लॉस (SL) का सख्ती से पालन करें। 
-                यह टूल Buy और Sell दोनों सिग्नल दिखाता है, दिशा (Trend) देखकर ही ट्रेड करें।
-            </p>
-        </div>
+# --- 2. कस्टम CSS (मोबाइल व्यू को सुंदर बनाने के लिए) ---
+st.markdown("""
+    <style>
+    .metric-card {
+        background-color: #f0f2f6;
+        border-left: 5px solid #ff4b4b;
+        padding: 15px;
+        border-radius: 10px;
+        box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
+    }
+    .stButton>button {
+        width: 100%;
+        background-color: #0068c9;
+        color: white;
+        height: 3em;
+        font-size: 20px;
+        border-radius: 10px;
+    }
+    </style>
     """, unsafe_allow_html=True)
 
-    st.title("📊 Nifty 500 - Live Intraday Hunter")
+# --- 3. पासवर्ड सिस्टम ---
+def check_password():
+    if "password_correct" not in st.session_state:
+        st.session_state["password_correct"] = False
+    
+    if not st.session_state["password_correct"]:
+        pwd = st.text_input("🔑 ऑथेंटिक पासवर्ड दर्ज करें:", type="password")
+        if pwd == "Raipur@2026":
+            st.session_state["password_correct"] = True
+            st.rerun()
+        elif pwd:
+            st.error("पासवर्ड गलत है।")
+        return False
+    return True
 
-    # --- 4. डेटा फंक्शन (Caching का उपयोग ताकि बार-बार डाउनलोड न हो) ---
-    @st.cache_data
-    def get_nifty500_tickers():
+# --- 4. इंडिकेटर कैलकुलेशन (Advanced Logic) ---
+def calculate_indicators(df):
+    # RSI (Relative Strength Index)
+    delta = df['Close'].diff()
+    gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+    rs = gain / loss
+    df['RSI'] = 100 - (100 / (1 + rs))
+    
+    # EMA (Exponential Moving Average - 20 Period)
+    df['EMA_20'] = df['Close'].ewm(span=20, adjust=False).mean()
+    
+    # VWAP (Volume Weighted Average Price)
+    df['VWAP'] = (df['Volume'] * (df['High'] + df['Low'] + df['Close']) / 3).cumsum() / df['Volume'].cumsum()
+    
+    return df
+
+# --- 5. मुख्य ऐप ---
+if check_password():
+    
+    # --- हेडर और टाइम नोटिफिकेशन ---
+    ist = pytz.timezone('Asia/Kolkata')
+    current_time = datetime.now(ist)
+    current_hour = current_time.hour
+    
+    # नोटिफिकेशन लॉजिक
+    time_msg = ""
+    rec_timeframe = "15m"
+    if current_hour < 10:
+        time_msg = "⚠️ बाजार अभी खुला है (Volatile)। 15 मिनट टाइमफ्रेम सुरक्षित है।"
+        rec_timeframe = "15m"
+    elif current_hour >= 14: # 2 बजे के बाद
+        time_msg = "⚠️ बाजार बंद होने वाला है। इंट्राडे पोजीशन स्क्वायर-ऑफ करें।"
+        rec_timeframe = "5m"
+    else:
+        time_msg = "✅ बाजार स्थिर है। आप 5 या 15 मिनट दोनों का उपयोग कर सकते हैं।"
+        rec_timeframe = "15m"
+
+    st.info(f"{time_msg} | अनुशंसित टाइमफ्रेम: **{rec_timeframe}**")
+
+    # --- इनपुट्स ---
+    col_tf, col_blank = st.columns([1, 2])
+    with col_tf:
+        timeframe = st.selectbox("टाइमफ्रेम चुनें:", ["5m", "15m", "30m"], index=1)
+
+    # --- खाली स्थान होल्डर्स (Placeholders for Cards) ---
+    # हम इन्हें बाद में भरेंगे जब स्कैन पूरा होगा
+    metrics_container = st.container()
+
+    # --- स्कैनर बटन (बीच में) ---
+    col_l, col_btn, col_r = st.columns([1, 2, 1])
+    with col_btn:
+        start_scan = st.button(f"🔍 START PRO SCANNER ({timeframe})")
+
+    # --- स्कैनिंग लॉजिक ---
+    if start_scan:
+        st.write("बाजार का विश्लेषण चल रहा है... कृपया प्रतीक्षा करें...")
+        
+        # Nifty 50 tickers (डेमो के लिए 50, स्पीड के लिए)
+        # आप इसे पूरा Nifty 500 कर सकते हैं
         try:
-            url = "https://www.niftyindices.com/IndexConstituent/ind_nifty500list.csv"
+            url = "https://www.niftyindices.com/IndexConstituent/ind_nifty50list.csv"
             headers = {'User-Agent': 'Mozilla/5.0'}
             s = requests.get(url, headers=headers).content
-            df = pd.read_csv(io.StringIO(s.decode('utf-8')))
-            tickers = [f"{x}.NS" for x in df['Symbol'].tolist()]
-            return tickers
+            df_nifty = pd.read_csv(io.StringIO(s.decode('utf-8')))
+            tickers = [f"{x}.NS" for x in df_nifty['Symbol'].tolist()]
         except:
-            return ['RELIANCE.NS', 'TATASTEEL.NS', 'SBIN.NS', 'HDFCBANK.NS'] # बैकअप
+            tickers = ['RELIANCE.NS', 'TATASTEEL.NS', 'HDFCBANK.NS', 'INFY.NS', 'SBIN.NS']
 
-    # --- 5. स्कैनिंग लॉजिक ---
-    def scan_market(tickers_list):
-        data_rows = []
+        results = []
+        buy_count = 0
+        sell_count = 0
         
-        # प्रोग्रेस बार
-        my_bar = st.progress(0)
-        total_stocks = len(tickers_list)
+        progress_bar = st.progress(0)
         
-        # अभी डेमो के लिए हम सिर्फ पहले 30 स्टॉक्स स्कैन करेंगे (ताकि ऐप हैंग न हो)
-        # आप इसे बढ़ाकर 'total_stocks' कर सकते हैं
-        limit = 30  
-        
-        for i, ticker in enumerate(tickers_list[:limit]):
+        for i, ticker in enumerate(tickers):
             try:
-                df = yf.download(ticker, period="1d", interval="15m", progress=False)
+                # डेटा लाएं (RSI/EMA के लिए कम से कम 5 दिन का डेटा चाहिए)
+                df = yf.download(ticker, period="5d", interval=timeframe, progress=False)
                 
-                if len(df) > 0:
-                    # Multi-index issue handling
+                if len(df) > 20:
+                    # Multi-index fix
                     if isinstance(df.columns, pd.MultiIndex):
                         df.columns = df.columns.get_level_values(0)
-
-                    current_data = df.iloc[-1] # लेटेस्ट 15 min कैंडल
                     
-                    o = round(current_data['Open'], 2)
-                    h = round(current_data['High'], 2)
-                    l = round(current_data['Low'], 2)
-                    c = round(current_data['Close'], 2)
+                    # इंडिकेटर लगाएं
+                    df = calculate_indicators(df)
+                    curr = df.iloc[-1]
                     
-                    # सिग्नल लॉजिक
+                    # वेरिएबल्स
+                    o = curr['Open']
+                    h = curr['High']
+                    l = curr['Low']
+                    c = curr['Close']
+                    rsi = curr['RSI']
+                    vwap = curr['VWAP']
+                    ema = curr['EMA_20']
+                    
+                    # --- CORE STRATEGY ---
                     signal = "AVOID"
-                    color = "⬜" # White circle for neutral
-                    entry = 0.0
-                    sl = 0.0
-                    target = 0.0
+                    status = "Weak"
                     
-                    # BUY CONDITION (Open = Low)
+                    # BUY: Open=Low AND Price > VWAP (Trend Confirmation)
                     if abs(o - l) <= (o * 0.001):
-                        signal = "STRONG BUY 🟢"
-                        entry = o
-                        sl = round(o * 0.99, 2)    # 1% SL
-                        target = round(o * 1.02, 2) # 2% Target
-                    
-                    # SELL CONDITION (Open = High)
+                        if c > vwap and rsi > 50:
+                            signal = "STRONG BUY"
+                            buy_count += 1
+                            status = "Strong Bullish"
+                        elif c > vwap:
+                            signal = "BUY" # थोड़ा कमजोर
+                        
+                    # SELL: Open=High AND Price < VWAP
                     elif abs(o - h) <= (o * 0.001):
-                        signal = "STRONG SELL 🔴"
-                        entry = o
-                        sl = round(o * 1.01, 2)    # 1% SL
-                        target = round(o * 0.98, 2) # 2% Target
+                        if c < vwap and rsi < 50:
+                            signal = "STRONG SELL"
+                            sell_count += 1
+                            status = "Strong Bearish"
+                        elif c < vwap:
+                            signal = "SELL"
 
-                    # डेटा लिस्ट में जोड़ें
-                    data_rows.append({
-                        "Stock Name": ticker.replace('.NS', ''),
-                        "Signal": signal,
-                        "CMP (Price)": c,
-                        "Entry Price": entry if signal != "AVOID" else "-",
-                        "Stop Loss": sl if signal != "AVOID" else "-",
-                        "Target": target if signal != "AVOID" else "-"
-                    })
-            except:
+                    if "BUY" in signal or "SELL" in signal:
+                        results.append({
+                            "Stock": ticker.replace('.NS', ''),
+                            "Action": signal,
+                            "Price": round(c, 2),
+                            "RSI": round(rsi, 1),
+                            "VWAP check": "Above" if c > vwap else "Below",
+                            "Stop Loss": round(l if "BUY" in signal else h, 2),
+                            "Target": round(c * 1.015 if "BUY" in signal else c * 0.985, 2)
+                        })
+            except Exception as e:
                 pass
             
-            # प्रोग्रेस बार अपडेट
-            my_bar.progress((i + 1) / limit)
+            progress_bar.progress((i + 1) / len(tickers))
 
-        return pd.DataFrame(data_rows)
-
-    # --- 6. यूजर इंटरफेस (UI) ---
-    
-    col1, col2 = st.columns([1, 4])
-    with col1:
-        if st.button("🚀 SCAN MARKET NOW"):
-            st.write("स्कैनिंग शुरू...")
-            tickers = get_nifty500_tickers()
-            result_df = scan_market(tickers)
+        # --- रिजल्ट दिखाना ---
+        
+        # 1. टॉप कार्ड्स अपडेट (Top Cards)
+        with metrics_container:
+            m1, m2, m3 = st.columns(3)
+            m1.metric("Strong Buy Signals", buy_count, delta=f"{buy_count} stocks")
+            m2.metric("Strong Sell Signals", sell_count, delta=f"-{sell_count} stocks", delta_color="inverse")
+            m3.metric("Total Scanned", len(tickers))
+        
+        # 2. डेटा टेबल (Data Table)
+        if results:
+            st.success(f"{len(results)} ट्रेड अवसर मिले!")
+            df_res = pd.DataFrame(results)
             
-            # --- 7. परिणाम दिखाना (Pinned Column Magic) ---
-            st.success("स्कैन पूरा हुआ!")
+            # Index सेट करें ताकि वह 'Pin' हो जाए
+            df_res.set_index("Stock", inplace=True)
             
-            # स्टॉक नाम को इंडेक्स बना दें ताकि वह 'Pin' (Sticky) हो जाए
-            result_df.set_index("Stock Name", inplace=True)
-            
-            # स्टाइलिंग के साथ टेबल दिखाएं
             st.dataframe(
-                result_df,
-                height=600,
+                df_res,
+                height=500,
                 use_container_width=True,
                 column_config={
-                    "Signal": st.column_config.TextColumn(
-                        "Trade Signal",
-                        help="Green for Buy, Red for Sell",
-                        width="medium"
+                    "Action": st.column_config.TextColumn(
+                        "Signal",
+                        help="Strong Buy/Sell based on OHL + RSI + VWAP",
                     ),
-                    "CMP (Price)": st.column_config.NumberColumn(
-                        "Current Price",
-                        format="₹ %.2f"
+                    "RSI": st.column_config.NumberColumn(
+                        "RSI (Momentum)",
+                        format="%.1f",
+                        help="Above 50 is Bullish, Below 50 is Bearish"
                     ),
+                    "VWAP check": st.column_config.TextColumn(
+                        "Trend (VWAP)",
+                        help="Price vs Institutional Avg Price"
+                    )
                 }
             )
-    
-    with col2:
-        st.info("👈 बाईं तरफ बटन दबाकर मार्केट स्कैन करें।")
-
-
+        else:
+            st.warning("कोई भी स्टॉक आपकी स्ट्रैटेजी (OHL + RSI + VWAP) से मैच नहीं कर रहा है।")
+            
