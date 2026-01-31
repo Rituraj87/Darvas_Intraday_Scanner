@@ -1,1 +1,1 @@
-# Darvas_Intraday_Scanner
+# Pro_Intraday_Scanner
