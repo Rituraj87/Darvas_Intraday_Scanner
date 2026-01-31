@@ -82,7 +82,7 @@ def check_password():
         st.markdown("<h2 style='text-align: center;'>🔒 Authentic Access System</h2>", unsafe_allow_html=True)
         col1, col2, col3 = st.columns([1,2,1])
         with col2:
-            pwd = st.text_input("एक्सेस कोड दर्ज करें (Pass: Raipur@2026)", type="password")
+            pwd = st.text_input("एक्सेस कोड दर्ज करें", type="password")
             if st.button("AUTHENTIC ENTRY 🔐"):
                 if pwd == "Raipur@2026":
                     st.session_state["password_correct"] = True
