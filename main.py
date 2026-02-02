@@ -6,11 +6,20 @@ import requests
 import io
 
 # --- 1. पेज सेटअप ---
-st.set_page_config(
-    page_title="Pro Trader AI Terminal",
-    layout="wide",
-    initial_sidebar_state="collapsed"
-)
+
+st.set_page_config(page_title="Pro Trader AI Terminal", layout="wide", initial_sidebar_state="collapsed")
+
+# --- 🔥 यह कोड यहाँ पेस्ट करें (FIX FOR KEYERROR) ---
+if 'scan_df' not in st.session_state:
+    st.session_state['scan_df'] = pd.DataFrame()
+if 'buy_list' not in st.session_state:
+    st.session_state['buy_list'] = []
+if 'sell_list' not in st.session_state:
+    st.session_state['sell_list'] = []
+if 'password_correct' not in st.session_state:
+    st.session_state['password_correct'] = False
+
+# ... इसके बाद बाकी कोड (CSS, Authentication आदि) शुरू करें ...
 
 # --- 2. Advance CSS (3D Cards + Day/Night Visibility + Pinning Fixes) ---
 st.markdown("""
