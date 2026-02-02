@@ -97,7 +97,7 @@ def check_password():
         st.markdown("<br><br><h2 style='text-align: center;'>🔐 QUANTUM TRADER ACCESS</h2>", unsafe_allow_html=True)
         col1, col2, col3 = st.columns([1,2,1])
         with col2:
-            pwd = st.text_input("ENTER SECURITY PROTOCOL (Pass: Raipur@2026)", type="password")
+            pwd = st.text_input("ENTER SECURITY PROTOCOL", type="password")
             if st.button("AUTHENTICATE SYSTEM"):
                 if pwd == "Raipur@2026":
                     st.session_state["password_correct"] = True
