@@ -4,3 +4,4 @@ yfinance
 pandas_ta
 requests
 numpy
+pip install plotly
