@@ -7,289 +7,284 @@ import io
 
 # --- 1. पेज सेटअप ---
 st.set_page_config(
-    page_title="Pro Intraday Advisor",
+    page_title="Pro Trader AI Terminal",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
 
-# --- 2. CSS (Day/Night Adaptive & 3D Cards) ---
+# --- 2. Advance CSS (3D Cards + Day/Night Visibility + Pinning Fixes) ---
 st.markdown("""
 <style>
-    /* 3D Adaptive Cards */
+    /* 3D Glassmorphism Cards */
     .metric-card {
-        background-color: var(--secondary-background-color); /* Auto adapts to theme */
-        border: 1px solid var(--text-color);
-        border-radius: 15px;
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(10px);
+        border-radius: 20px;
         padding: 20px;
-        box-shadow: 4px 4px 10px rgba(0,0,0,0.3);
+        box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
         text-align: center;
         margin-bottom: 20px;
-        transition: transform 0.2s;
     }
     .metric-card:hover {
-        transform: scale(1.02);
-    }
-    .card-title {
-        font-size: 1.1rem;
-        font-weight: 600;
-        color: var(--text-color); /* Auto text color */
-        opacity: 0.8;
-    }
-    .card-value-green {
-        color: #00FF7F;
-        font-size: 2.2rem;
-        font-weight: 900;
-        text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
-    }
-    .card-value-red {
-        color: #FF4B4B;
-        font-size: 2.2rem;
-        font-weight: 900;
-        text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+        transform: translateY(-5px);
+        box-shadow: 0 12px 40px rgba(0,0,0,0.4);
     }
     
-    /* Advisor Note Box */
-    .advisor-box {
-        background-color: rgba(255, 255, 0, 0.1);
-        border-left: 5px solid #FFD700;
-        padding: 15px;
-        margin-bottom: 20px;
-        border-radius: 5px;
+    /* Day Mode Specifics */
+    @media (prefers-color-scheme: light) {
+        .metric-card {
+            background: linear-gradient(145deg, #ffffff, #e6e6e6);
+            box-shadow: 5px 5px 10px #d9d9d9, -5px -5px 10px #ffffff;
+            color: #333;
+        }
+        .stock-list { color: #555; }
     }
-    .advisor-text {
-        font-size: 14px;
-        line-height: 1.6;
-        color: var(--text-color);
+
+    /* Night Mode Specifics */
+    @media (prefers-color-scheme: dark) {
+        .metric-card {
+            background: linear-gradient(145deg, #1e1e1e, #2d2d2d);
+            box-shadow: 5px 5px 15px #121212, -5px -5px 15px #383838;
+            color: #e0e0e0;
+        }
+        .stock-list { color: #ccc; }
     }
+
+    /* Card Text Styles */
+    .card-title { font-size: 1.1rem; font-weight: bold; margin-bottom: 5px; opacity: 0.8; }
+    .card-count { font-size: 2.5rem; font-weight: 900; margin: 0; }
+    .stock-list { font-size: 0.85rem; margin-top: 10px; font-family: monospace; overflow-wrap: break-word; }
     
+    .green-text { color: #00e676; }
+    .red-text { color: #ff5252; }
+
     /* Authentic Button */
-    .stButton>button {
+    div.stButton > button {
         width: 100%;
-        height: 55px;
-        font-size: 20px;
-        font-weight: bold;
         border-radius: 12px;
-        background: linear-gradient(90deg, #1E90FF, #00BFFF);
+        height: 55px;
+        background: linear-gradient(90deg, #4b6cb7 0%, #182848 100%);
         color: white;
+        font-weight: bold;
         border: none;
         box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    }
+    div.stButton > button:hover {
+        transform: scale(1.02);
+        box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+    }
+
+    /* Warning Box Style */
+    .advisor-note {
+        padding: 20px;
+        border-left: 5px solid #ff9800;
+        background-color: rgba(255, 152, 0, 0.1);
+        border-radius: 5px;
+        margin-bottom: 25px;
+        font-size: 0.95rem;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# --- 3. ऑथेंटिकेशन ---
+# --- 3. Authentication ---
 def check_password():
     if "password_correct" not in st.session_state:
         st.session_state["password_correct"] = False
 
     if not st.session_state["password_correct"]:
-        st.markdown("<h2 style='text-align: center;'>🔐 ACCESS PROTOCOL</h2>", unsafe_allow_html=True)
+        st.markdown("<br><br><h2 style='text-align: center;'>🔐 QUANTUM TRADER ACCESS</h2>", unsafe_allow_html=True)
         col1, col2, col3 = st.columns([1,2,1])
         with col2:
-            pwd = st.text_input("Enter Authentic Code:", type="password")
-            if st.button("AUTHENTICATE"):
+            pwd = st.text_input("ENTER SECURITY PROTOCOL (Pass: Raipur@2026)", type="password")
+            if st.button("AUTHENTICATE SYSTEM"):
                 if pwd == "Raipur@2026":
                     st.session_state["password_correct"] = True
                     st.rerun()
                 else:
-                    st.error("Access Denied. Incorrect Credentials.")
+                    st.error("ACCESS DENIED: INVALID CREDENTIALS")
         return False
     return True
 
-# --- 4. डेटा और लॉजिक ---
+# --- 4. Logic & Calculations ---
+def calculate_technicals(df):
+    try:
+        df['RSI'] = ta.rsi(df['Close'], length=14)
+        df['EMA_9'] = ta.ema(df['Close'], length=9)
+        df['EMA_21'] = ta.ema(df['Close'], length=21)
+        df.ta.vwap(append=True)
+        return df
+    except:
+        return df
+
 @st.cache_data
 def get_nifty_tickers():
     try:
-        # Nifty 100 for speed, change url to nifty500list.csv for all
+        # Nifty 100 for speed, change to 500 later if needed
         url = "https://www.niftyindices.com/IndexConstituent/ind_nifty100list.csv"
         headers = {'User-Agent': 'Mozilla/5.0'}
         s = requests.get(url, headers=headers).content
         df = pd.read_csv(io.StringIO(s.decode('utf-8')))
         return [f"{x}.NS" for x in df['Symbol'].tolist()]
     except:
-        return ['RELIANCE.NS', 'TATASTEEL.NS', 'HDFCBANK.NS', 'SBIN.NS', 'INFY.NS', 'ICICIBANK.NS']
-
-def calculate_technicals(df):
-    df['RSI'] = ta.rsi(df['Close'], length=14)
-    df['EMA_9'] = ta.ema(df['Close'], length=9)
-    df['EMA_21'] = ta.ema(df['Close'], length=21)
-    df.ta.vwap(append=True) # Adds VWAP_D
-    return df
+        return ['RELIANCE.NS', 'TCS.NS', 'HDFCBANK.NS', 'SBIN.NS']
 
 # --- MAIN APP ---
 if check_password():
-    
-    # 1. Advisor Notification (लंबा-चौड़ा नोट)
+
+    # --- ADVANCED NOTIFICATION / ADVISOR NOTE ---
     st.markdown("""
-    <div class="advisor-box">
-        <h3>📢 AI TRADING ADVISOR NOTE (PLEASE READ)</h3>
-        <div class="advisor-text">
-            <b>1. Trend is King:</b> कभी भी मार्केट के ट्रेंड के खिलाफ ट्रेड न करें। अगर 'Strong Sell' है, तो गलती से भी Buy न करें।<br>
-            <b>2. Capital Protection:</b> इंट्राडे में अपनी कुल पूंजी का केवल 20% उपयोग करें। <br>
-            <b>3. Stop Loss (SL):</b> यह एप्प आपको SL सुझाव देता है। इसे भगवान की लकीर मानें। <b>SL हिट हो तो तुरंत एग्जिट करें, उम्मीद में न बैठें।</b><br>
-            <b>4. Overtrading:</b> दिन में 2 या 3 अच्छे ट्रेड ही काफी हैं। जबरदस्ती हर सिग्नल पर ट्रेड न लें।<br>
-            <b>5. Confirmation:</b> "Strong Buy/Sell" का मतलब है कि Open=Low/High के साथ-साथ RSI और EMA भी सपोर्ट कर रहे हैं। यही सबसे सुरक्षित ट्रेड हैं।<br>
-            <b>6. Volatility:</b> 9:15 AM से 9:30 AM तक बाजार बहुत अस्थिर रहता है। नए लोग 9:30 के बाद ही एंट्री लें।
-        </div>
+    <div class="advisor-note">
+        <strong>⚠️ FINANCIAL ADVISOR ALERT (महत्वपूर्ण सूचना):</strong> <br>
+        प्रिय ट्रेडर, यह सिस्टम केवल एक <strong>Probability Tool</strong> है। मार्केट में 100% कुछ भी निश्चित नहीं होता।
+        <ul>
+            <li><strong>Entry Rule:</strong> कभी भी ट्रेड लेते समय यह देखें कि मार्केट का ओवरऑल ट्रेंड (Nifty 50) क्या है। ट्रेंड के खिलाफ ट्रेड न लें।</li>
+            <li><strong>Risk Management:</strong> हर ट्रेड में स्टॉप लॉस (SL) अनिवार्य है। अपनी कुल कैपिटल का 2% से ज्यादा जोखिम एक ट्रेड पर न लें।</li>
+            <li><strong>Confirmation:</strong> केवल 'Open=High' या 'Open=Low' काफी नहीं है। RSI और VWAP का सपोर्ट देखें। अगर सिग्नल 'STRONG' है लेकिन RSI कमजोर है, तो ट्रेड को <strong>AVOID</strong> करें।</li>
+            <li><strong>Discipline:</strong> ज्यादा लालच न करें। टारगेट हिट होते ही प्रॉफिट बुक करें या SL को ट्रेल करें।</li>
+        </ul>
     </div>
     """, unsafe_allow_html=True)
 
-    # 2. कंट्रोल पैनल
-    col_ctrl1, col_ctrl2 = st.columns([3, 1])
-    with col_ctrl1:
-        st.title("📊 LIVE INTRADAY SCREENER")
-    with col_ctrl2:
-        timeframe = st.selectbox("⏳ Candle Timeframe", ["15m", "5m", "30m", "60m"], index=0)
+    # --- Header & Controls ---
+    col_head1, col_head2 = st.columns([3, 1])
+    with col_head1:
+        st.title("📊 Advance Intraday Scanner")
+    with col_head2:
+        timeframe = st.selectbox("Timeframe", ["15m", "5m", "30m", "1h"], index=0)
 
-    # 3. स्कैन बटन
-    if st.button("🚀 SCAN NIFTY MARKET"):
-        
+    # State variables
+    if 'scan_df' not in st.session_state: st.session_state['scan_df'] = pd.DataFrame()
+    if 'buy_list' not in st.session_state: st.session_state['buy_list'] = []
+    if 'sell_list' not in st.session_state: st.session_state['sell_list'] = []
+
+    # --- SCANNER BUTTON ---
+    col_b1, col_b2, col_b3 = st.columns([1, 2, 1])
+    with col_b2:
+        scan_btn = st.button("🔍 START DEEP SCAN (Live Market)")
+
+    if scan_btn:
         tickers = get_nifty_tickers()
-        data_rows = []
-        buy_c = 0
-        sell_c = 0
+        rows = []
+        buy_names = []
+        sell_names = []
         
-        progress_bar = st.progress(0, text="Initializing Scanner...")
-        total = 30 # डेमो लिमिट (स्पीड के लिए) - इसे बढ़ाकर len(tickers) कर सकते हैं
+        my_bar = st.progress(0, text="Initializing Quantum Scan...")
+        limit = 30 # Demo limit
         
-        for i, ticker in enumerate(tickers[:total]):
+        for i, ticker in enumerate(tickers[:limit]):
             try:
-                # डेटा डाउनलोड
                 df = yf.download(ticker, period="5d", interval=timeframe, progress=False)
-                
                 if len(df) > 20:
-                    if isinstance(df.columns, pd.MultiIndex):
-                        df.columns = df.columns.get_level_values(0)
-                    
+                    if isinstance(df.columns, pd.MultiIndex): df.columns = df.columns.get_level_values(0)
                     df = calculate_technicals(df)
+                    
                     curr = df.iloc[-1]
+                    o, h, l, c = curr['Open'], curr['High'], curr['Low'], curr['Close']
+                    rsi = curr.get('RSI', 50)
+                    vwap = curr.get('VWAP_D', c)
                     
-                    # वेरिएबल्स
-                    c = curr['Close']
-                    o = curr['Open']
-                    h = curr['High']
-                    l = curr['Low']
-                    rsi = curr['RSI']
-                    vwap = curr.get('VWAP_D', c) # fallback to C if VWAP fails
-                    ema9 = curr['EMA_9']
-                    ema21 = curr['EMA_21']
-                    
-                    # लॉजिक
-                    status = "AVOID" # डिफॉल्ट
+                    # LOGIC
+                    signal = "AVOID ⚪" # Default neutral visibility
                     entry = 0.0
                     target = 0.0
                     sl = 0.0
                     
-                    # कंडीशन
-                    open_low = abs(o - l) <= (o * 0.001)
-                    open_high = abs(o - h) <= (o * 0.001)
-                    bullish = (rsi > 50) and (c > vwap) and (ema9 > ema21)
-                    bearish = (rsi < 50) and (c < vwap) and (ema9 < ema21)
-                    
-                    if open_low:
-                        if bullish:
-                            status = "STRONG BUY"
-                            buy_c += 1
-                        else:
-                            status = "BUY (Weak)"
+                    # BUY
+                    if abs(o - l) <= (o * 0.001):
+                        strength = "WEAK"
+                        if rsi > 55 and c > vwap: strength = "STRONG 🚀"
+                        signal = f"BUY ({strength})"
                         entry = o
                         sl = o * 0.99
-                        target = o * 1.02
-                        
-                    elif open_high:
-                        if bearish:
-                            status = "STRONG SELL"
-                            sell_c += 1
-                        else:
-                            status = "SELL (Weak)"
+                        target = o * 1.015
+                        if "STRONG" in strength: buy_names.append(ticker.replace('.NS',''))
+
+                    # SELL
+                    elif abs(o - h) <= (o * 0.001):
+                        strength = "WEAK"
+                        if rsi < 45 and c < vwap: strength = "STRONG 🩸"
+                        signal = f"SELL ({strength})"
                         entry = o
                         sl = o * 1.01
-                        target = o * 0.98
-                    
-                    else:
-                        # AVOID केस में भी CMP दिखाएंगे, लेकिन Entry/Target खाली रखेंगे
-                        status = "AVOID"
-                        entry = 0.0 
-                        target = 0.0
-                        sl = 0.0
-                    
-                    # डेटा लिस्ट में जोड़ें (Column Order: Stock, Status, CMP, Entry, Target, SL...)
-                    data_rows.append({
+                        target = o * 0.985
+                        if "STRONG" in strength: sell_names.append(ticker.replace('.NS',''))
+
+                    rows.append({
                         "Stock": ticker.replace('.NS', ''),
-                        "Status": status,
-                        "CMP": c,
-                        "Entry": entry if entry > 0 else None, # None means cell will be empty
+                        "Signal": signal,
+                        "Entry Price": entry if entry > 0 else None,
                         "Target": target if target > 0 else None,
                         "Stop Loss": sl if sl > 0 else None,
-                        "RSI": rsi,
-                        "EMA Cross": "Yes" if ema9 > ema21 else "No"
+                        "CMP": c,
+                        "RSI": rsi
                     })
-                    
-            except Exception as e:
-                pass
-            
-            progress_bar.progress((i+1)/total)
-            
-        progress_bar.empty()
+            except: pass
+            my_bar.progress((i+1)/limit)
         
-        # सेशन स्टेट में सेव करें
-        st.session_state['data'] = pd.DataFrame(data_rows)
-        st.session_state['buy_count'] = buy_c
-        st.session_state['sell_count'] = sell_c
+        my_bar.empty()
+        st.session_state['scan_df'] = pd.DataFrame(rows)
+        st.session_state['buy_list'] = buy_names
+        st.session_state['sell_list'] = sell_names
 
-    # 4. परिणाम (Results)
-    if 'data' in st.session_state and not st.session_state['data'].empty:
-        
-        # --- टॉप कार्ड्स (3D) ---
-        col1, col2 = st.columns(2)
-        with col1:
-            st.markdown(f"""
-            <div class="metric-card">
-                <div class="card-title">🚀 STRONG BUY OPPORTUNITIES</div>
-                <div class="card-value-green">{st.session_state['buy_count']}</div>
-            </div>
-            """, unsafe_allow_html=True)
-        with col2:
-            st.markdown(f"""
-            <div class="metric-card">
-                <div class="card-title">🩸 STRONG SELL SIGNALS</div>
-                <div class="card-value-red">{st.session_state['sell_count']}</div>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        # --- मेन टेबल ---
-        df = st.session_state['data']
-        
-        # स्टाइलिंग फंक्शन
-        def color_status(val):
-            color = 'var(--text-color)' # Default adaptive color
-            weight = 'normal'
-            if 'STRONG BUY' in str(val):
-                color = '#00FF00'
-                weight = 'bold'
-            elif 'STRONG SELL' in str(val):
-                color = '#FF0000'
-                weight = 'bold'
-            elif 'AVOID' in str(val):
-                color = 'gray' # Neutral gray for Avoid
-            return f'color: {color}; font-weight: {weight}'
+    # --- 5. RESULT DASHBOARD ---
+    
+    # --- 3D CARDS SECTION ---
+    st.write("### Market Momentum")
+    c1, c2 = st.columns(2)
+    
+    # Helper to display list nicely
+    b_str = ", ".join(st.session_state['buy_list']) if st.session_state['buy_list'] else "None"
+    s_str = ", ".join(st.session_state['sell_list']) if st.session_state['sell_list'] else "None"
 
-        # Dataframe दिखाना (Pinned Columns के साथ)
+    with c1:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="card-title green-text">BULLISH RADAR (STRONG BUY)</div>
+            <div class="card-count green-text">{len(st.session_state['buy_list'])}</div>
+            <div class="stock-list">{b_str}</div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+    with c2:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="card-title red-text">BEARISH RADAR (STRONG SELL)</div>
+            <div class="card-count red-text">{len(st.session_state['sell_list'])}</div>
+            <div class="stock-list">{s_str}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # --- DATA TABLE ---
+    if not st.session_state['scan_df'].empty:
+        df_display = st.session_state['scan_df'].copy()
+        
+        # 1. Set Index to remove Serial Number and Pin Stock Name
+        df_display.set_index("Stock", inplace=True)
+        
+        # 2. Color Logic for Table
+        def highlight_vals(val):
+            color = ''
+            if 'STRONG 🚀' in str(val): color = 'background-color: #e8f5e9; color: green; font-weight: bold'
+            elif 'STRONG 🩸' in str(val): color = 'background-color: #ffebee; color: red; font-weight: bold'
+            elif 'AVOID' in str(val): color = 'color: #ff9800' # Orange for visibility in Day/Night
+            return color
+
+        # 3. Column Configuration (Format .00 and Pinning)
         st.dataframe(
-            df.style.map(color_status, subset=['Status']),
-            use_container_width=True,
+            df_display.style.map(highlight_vals, subset=['Signal']),
             height=600,
-            hide_index=True, # सीरियल नंबर हटा दिया
+            use_container_width=True,
             column_config={
-                "Stock": st.column_config.TextColumn("Stock Name", pinned=True), # PINNED
-                "Status": st.column_config.TextColumn("Signal", pinned=True, width="medium"), # PINNED
-                "CMP": st.column_config.NumberColumn("CMP (₹)", format="%.2f"),
-                "Entry": st.column_config.NumberColumn("Entry Price", format="%.2f"), # RE-ADDED
-                "Target": st.column_config.NumberColumn("Target (2%)", format="%.2f"), # RE-ADDED
-                "Stop Loss": st.column_config.NumberColumn("Stop Loss", format="%.2f"),
-                "RSI": st.column_config.NumberColumn("RSI", format="%.2f"),
+                "Stock": st.column_config.TextColumn("Stock Name", pinned=True), # Pinned logic
+                "Signal": st.column_config.TextColumn("Trade Status", width="medium"), 
+                "Entry Price": st.column_config.NumberColumn("Entry (₹)", format="%.2f"),
+                "Target": st.column_config.NumberColumn("Target (₹)", format="%.2f"),
+                "Stop Loss": st.column_config.NumberColumn("SL (₹)", format="%.2f"),
+                "CMP": st.column_config.NumberColumn("Current (₹)", format="%.2f"),
+                "RSI": st.column_config.NumberColumn("RSI", format="%.1f"),
             }
         )
-    else:
-        st.info("👆 ऊपर 'SCAN NIFTY MARKET' बटन दबाकर स्कैन शुरू करें।")
-
+    elif scan_btn:
+        st.info("No data matched. Market might be sideways.")
