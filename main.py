@@ -6,20 +6,11 @@ import requests
 import io
 
 # --- 1. पेज सेटअप ---
-
-st.set_page_config(page_title="Pro Trader AI Terminal", layout="wide", initial_sidebar_state="collapsed")
-
-# --- 🔥 यह कोड यहाँ पेस्ट करें (FIX FOR KEYERROR) ---
-if 'scan_df' not in st.session_state:
-    st.session_state['scan_df'] = pd.DataFrame()
-if 'buy_list' not in st.session_state:
-    st.session_state['buy_list'] = []
-if 'sell_list' not in st.session_state:
-    st.session_state['sell_list'] = []
-if 'password_correct' not in st.session_state:
-    st.session_state['password_correct'] = False
-
-# ... इसके बाद बाकी कोड (CSS, Authentication आदि) शुरू करें ...
+st.set_page_config(
+    page_title="Pro Trader AI Terminal",
+    layout="wide",
+    initial_sidebar_state="collapsed"
+)
 
 # --- 2. Advance CSS (3D Cards + Day/Night Visibility + Pinning Fixes) ---
 st.markdown("""
@@ -297,50 +288,3 @@ if check_password():
         )
     elif scan_btn:
         st.info("No data matched. Market might be sideways.")
-
-import plotly.graph_objects as go
-
-# ... (बाकी कोड वही रहेगा)
-
-# जहाँ डेटाफ्रेम (Table) दिखा रहे हैं, उसके ठीक नीचे यह कोड डालें:
-
-if not st.session_state['scan_df'].empty:
-    st.write("---")
-    st.subheader("📈 Visual Chart Analysis (Click to Expand)")
-
-    # हर स्टॉक के लिए एक बटन/Expander बनाएं
-    for index, row in st.session_state['scan_df'].iterrows():
-        stock_name = row['Stock']
-        signal = row['Signal']
-        
-        # केवल STRONG सिग्नल वालों का चार्ट दिखाएं
-        if "STRONG" in signal:
-            with st.expander(f"Show Chart: {stock_name} ({signal})"):
-                try:
-                    # उस स्टॉक का डेटा फिर से लाएं (Plotting के लिए)
-                    data = yf.download(stock_name + ".NS", period="5d", interval=timeframe, progress=False)
-                    
-                    if isinstance(data.columns, pd.MultiIndex):
-                        data.columns = data.columns.get_level_values(0)
-                    
-                    # Candlestick Chart
-                    fig = go.Figure(data=[go.Candlestick(x=data.index,
-                                    open=data['Open'],
-                                    high=data['High'],
-                                    low=data['Low'],
-                                    close=data['Close'],
-                                    name=stock_name)])
-
-                    # VWAP Line जोड़ें (अगर डेटा में है)
-                    # Note: VWAP calculation needs to be done via pandas_ta before plotting
-                    
-                    fig.update_layout(
-                        title=f"{stock_name} - {timeframe} Chart",
-                        xaxis_rangeslider_visible=False,
-                        template="plotly_dark", # Night mode look
-                        height=400
-                    )
-                    
-                    st.plotly_chart(fig, use_container_width=True)
-                except Exception as e:
-                    st.error(f"Could not load chart for {stock_name}")
